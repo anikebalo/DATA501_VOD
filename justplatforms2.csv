@@ -1,0 +1,84 @@
+,allplatforms,RomanceProp,ThrillerProp
+1,Netflix,0.183523893,0.224860745
+2,Amazon,0.202295918,0.350255102
+3,"Netflix, Amazon",0.185786387,0.2809985
+4,"Netflix, HboMax, Amazon, Disney",0.163924498,0.239022913
+5,"Netflix, HboMax, Amazon, Filmin, Disney, Apple, Skyshowtime",0.132190875,0.220299758
+6,"Netflix, Amazon, Disney",0.176863925,0.253761284
+7,"Netflix, HboMax, Amazon",0.169872958,0.261584997
+8,"HboMax, Amazon, Disney, Skyshowtime, Discovery",0.141055467,0.227745806
+9,"Netflix, Apple",0.198497466,0.252986966
+10,"Netflix, HboMax, Amazon, Filmin, Disney",0.134087723,0.387242139
+11,"Netflix, Disney",0.169206412,0.196912725
+12,HboMax,0.085653105,0.172376874
+13,Disney,0.149817296,0.149817296
+14,"HboMax, Amazon, Apple",0.185253382,0.264910736
+15,"HboMax, Amazon, Filmin, Disney, Apple, Skyshowtime",0.241636697,0.234986768
+16,"HboMax, Amazon",0.173671199,0.307169345
+17,"Amazon, Disney, Apple",0.18099856,0.252367604
+18,"Netflix, HboMax, Amazon, Filmin, Disney, Apple, Skyshowtime, Starzplay, Discovery",0.150101112,0.208392315
+19,"Netflix, HboMax, Amazon, Disney, Skyshowtime",0.160947086,0.237346626
+20,Non,0,0
+21,"Netflix, HboMax, Disney, Flixole",0.153741342,0.184625866
+22,"HboMax, Amazon, Disney",0.165640394,0.263238916
+23,"HboMax, Amazon, Filmin",0.118386377,0.304682749
+24,"Amazon, Disney",0.185364977,0.288205681
+25,"Netflix, Amazon, Disney, Flixole",0.165776308,0.226320699
+26,"Netflix, HboMax, Amazon, Disney, Apple",0.164386685,0.225319197
+27,"Netflix, Amazon, Disney, Apple, Starzplay",0.170624708,0.232919981
+28,"Netflix, Amazon, Filmin, Disney",0.144277508,0.252761821
+29,"Netflix, HboMax, Amazon, Apple",0.175198088,0.242862533
+30,"Netflix, Amazon, Disney, Starzplay",0.174225605,0.250872185
+31,"Netflix, HboMax, Disney",0.152664106,0.185234675
+32,"Netflix, HboMax, Amazon, Filmin, Disney, Apple",0.135447994,0.224649606
+33,"Netflix, Amazon, Disney, Skyshowtime",0.173089071,0.252053064
+34,"Netflix, HboMax, Disney, Skyshowtime",0.150030713,0.191031941
+35,Apple,0.220243551,0.28610711
+36,"Netflix, Amazon, Disney, Apple",0.171944612,0.233955449
+37,"Netflix, HboMax, Amazon, Filmin, Disney, Flixole, Skyshowtime",0.129622684,0.296976971
+38,"Netflix, Amazon, Disney, Discovery",0.157327799,0.227789307
+39,"Netflix, HboMax, Amazon, Disney, Flixole, Skyshowtime, Other",0.15439179,0.216269242
+40,"Filmin, Skyshowtime",0.197019868,0.331125828
+41,"Netflix, Amazon, Apple",0.184259754,0.253407269
+42,"Amazon, Apple",0.19736956,0.279484295
+43,"Netflix, HboMax, Amazon, Discovery",0.149718415,0.232706407
+44,"Netflix, Amazon, Skyshowtime",0.180626273,0.277113035
+45,"Netflix, Skyshowtime",0.177083333,0.233231707
+46,"Amazon, Skyshowtime",0.195275591,0.338582677
+47,"Netflix, HboMax",0.158803222,0.205293441
+48,"Netflix, HboMax, Amazon, Filmin",0.16970278,0.260186961
+49,"Netflix, HboMax, Apple",0.186362878,0.239609414
+50,"HboMax, Amazon, Skyshowtime",0.170105968,0.299869864
+51,"Netflix, HboMax, Disney, Starzplay, Discovery",0.128625804,0.161832261
+52,Filmin,0.253164557,0.253164557
+53,"Netflix, HboMax, Amazon, Disney, Apple, Starzplay",0.1640599,0.224570161
+54,"Netflix, Amazon, Filmin",0.185425101,0.279487179
+55,"Netflix, HboMax, Amazon, Filmin, Disney, Apple, Discovery",0.1542437,0.212424743
+56,"Netflix, HboMax, Filmin",0.158679928,0.204339964
+57,"HboMax, Amazon, Disney, Apple",0.170664402,0.241137763
+58,"Netflix, HboMax, Amazon, Disney, Apple, Skyshowtime",0.160329847,0.220986219
+59,"Netflix, HboMax, Amazon, Disney, Starzplay",0.162128356,0.237082652
+60,"Netflix, HboMax, Amazon, Filmin, Disney, acontra",0.128541686,0.237802118
+61,"Netflix, HboMax, Amazon, Disney, Flixole",0.15651764,0.21686179
+62,"HboMax, Disney",0.124611801,0.153338509
+63,"HboMax, Amazon, Disney, Discovery",0.141455116,0.227427375
+64,"HboMax, Amazon, Disney, Flixole",0.156075569,0.226921426
+65,"HboMax, Amazon, Disney, Skyshowtime",0.163367042,0.260931491
+66,"Netflix, HboMax, Amazon, Skyshowtime",0.165984073,0.258248009
+67,"Netflix, Amazon, Discovery",0.16125988,0.246313554
+68,"Amazon, Disney, Skyshowtime",0.181534418,0.285197963
+69,"Netflix, HboMax, Amazon, Disney, Apple, Other",0.164386685,0.225376197
+70,"Netflix, Filmin",0.175644699,0.223782235
+71,Starzplay,0.125514403,0.197530864
+72,"Netflix, HboMax, Amazon, Disney, Flixole, Discovery",0.143948677,0.200965905
+73,"Netflix, Amazon, Flixole",0.170525071,0.241848094
+74,"Netflix, HboMax, Amazon, Filmin, Disney, Flixole, Starzplay, Discovery",0.143371658,0.20023549
+75,"Netflix, Amazon, Disney, Apple, Skyshowtime, Starzplay",0.166335622,0.228363884
+76,"Netflix, HboMax, Amazon, Disney, Flixole, Apple",0.211893538,0.212531919
+77,Flixole,0.163120567,0.194326241
+78,"Amazon, Flixole",0.174035608,0.264540059
+79,"Netflix, HboMax, Amazon, Disney, Skyshowtime, Starzplay",0.159369848,0.235574281
+80,"Netflix, HboMax, Amazon, Disney, Apple, Discovery",0.154574639,0.21305511
+81,"Netflix, Discovery",0.138468291,0.17445688
+82,"Netflix, Amazon, Disney, Skyshowtime, Discovery",0.154922961,0.227546035
+83,"HboMax, Amazon, Filmin, Disney",0.123193916,0.261901141

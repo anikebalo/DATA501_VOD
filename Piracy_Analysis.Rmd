@@ -1,0 +1,2304 @@
+```{r}
+#install.packages("reactablefmtr")
+#install.packages("ggpbur")
+#install.packages("caret")
+library(ggpubr)
+library(ggplot2)
+library(plotly)
+library(mosaic)
+library(ggthemes)
+library(reactable)
+library(htmltools)
+library(reactablefmtr)
+library(tidyr)
+library(dplyr)
+library("FactoMineR")
+library("factoextra")
+library(glmnet)
+library(caret)
+```
+
+
+
+```{r}
+load("piracydf.RData")
+load("piracyfactors.RData")
+load("piracy.allfactors.RData")
+load("content.RData")
+options(scipen = 999)
+```
+
+```{r}
+piracy.df$Piracy_use <- as.factor(piracy.df$Piracy_use)
+```
+
+
+# Explanatory Data Analysis
+
+## Content Availability
+
+### Difference in Means between Piracy and Non-Piracy Available Content
+
+```{r}
+piracy.df %>%
+  mutate(Piracy_use = recode_factor(Piracy_use, "1" = "Pirate", "0" = "Non-Pirate")) %>%
+  favstats(~content_avail | Piracy_use, data=.) %>%
+  reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+  #adjust table font
+  theme = reactableTheme( style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+
+```
+#### Normality
+
+```{r}
+options(scipen = 999)
+```
+
+
+```{r}
+
+piracy.df %>%
+  filter(Piracy_use == 1) %>%
+  ggplot(., aes(x = content_avail)) + geom_histogram(aes(y = ..density..), 
+  bins = 10, fill = "skyblue", color = "black", alpha = 0.7) + geom_density(color = "red", size = 1) + xlab("Content Availability") + theme_stata() + ggtitle("Normality of Content Availability Amongst Pirates")
+
+
+piracy.df %>%
+  filter(Piracy_use == 0) %>%
+  ggplot(., aes(x = content_avail)) + geom_histogram(aes(y = ..density..), 
+  bins = 10, fill = "skyblue", color = "black", alpha = 0.7) + geom_density(color = "red", size = 1) + xlab("Content Availability") + theme_stata() + ggtitle("Normality of Content Availability Amongst Non-Pirates")
+```
+
+
+
+```{r}
+# Shapiro-Wilk normality test for pirates
+with(piracy.df, shapiro.test(content_avail[Piracy_use == 1]))# p = 0.1
+# Shapiro-Wilk normality test for non-pirates
+with(piracy.df, shapiro.test(content_avail[Piracy_use == 0])) # p = 0.6
+
+```
+
+**Non Normal but N>25**
+
+#### Boxplot
+https://r-graph-gallery.com/histogram_several_group.html
+```{r}
+
+p <- piracy.df %>%
+  mutate(Piracy_use = recode_factor(Piracy_use, "1" = "Pirate", "0" = "Non-Pirate")) %>%
+  ggboxplot(., x = "Piracy_use", y = "content_avail",
+          color = "Piracy_use", palette = c("#00AFBB", "#E7B800"),
+        ylab = "Content Availability", xlab = "Piracy Use")  + theme_stata() + ggtitle("Content Availability and Piracy Use") + theme(legend.position="none")
+  
+
+ggplotly(p) 
+```
+
+#### T.Test
+```{r}
+var.test(content_avail ~ Piracy_use, data = piracy.df)
+t.test(content_avail ~ Piracy_use, data = piracy.df, var.equal = FALSE)
+```
+The mean average amount of content available to piraters and non-piraters is the same
+
+### Difference in Means between Piracy and Non-Piracy between the Sexes
+
+#### Boxplot
+
+```{r}
+
+piracy.df %>%
+  mutate(Piracy_use = recode_factor(Piracy_use, "1" = "Pirate", "0" = "Non-Pirate")) %>%
+  mutate(Sex = as.factor(Sex)) %>%
+  mutate(Sex = recode_factor(Sex, "1" = "Male", "2" = "Female")) %>%
+  ggboxplot(., x = "Piracy_use", y = "content_avail",
+          color = "Sex", palette = c("#6F8FAF", "#FFC0CB"),
+        ylab = "Content Availability", xlab = "Piracy Use")  + theme_stata() + ggtitle("Content Availability and Piracy Use - Sex")
+```
+
+
+```{r}
+# Shapiro-Wilk normality test for Piracy's weights
+with(piracy.df, shapiro.test(Sex[Piracy_use == 1]))# p = 0.1
+
+# Shapiro-Wilk normality test for Non-Piracy's weights
+with(piracy.df, shapiro.test(Sex[Piracy_use == 0]))
+```
+n>25 so can assume normality
+
+```{r}
+piracy.df %>%
+  filter(Sex == 1) %>%
+  var.test(content_avail ~ Piracy_use, data = .)
+
+
+piracy.df %>%
+  filter(Sex == 2) %>%
+  var.test(content_avail ~ Piracy_use, data = .)
+```
+no significant difference between the variance
+
+#### T.Test
+
+```{r}
+piracy.df %>%
+  filter(Sex == 1) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = FALSE)
+
+
+piracy.df %>%
+  filter(Sex == 2) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = FALSE)
+```
+
+No difference in interest level between those who pirate and those who don't
+
+
+### Difference in Means between Piracy and Non-Piracy between the Education
+
+#### Boxplot
+
+```{r}
+
+piracy.df %>%
+  mutate(Piracy_use = recode_factor(Piracy_use, "1" = "Pirate", "0" = "Non-Pirate")) %>%
+  mutate(Education = as.factor(Education)) %>%
+  mutate(Education = recode_factor(Education, "1" = "Primary", "2" = "Seconday", "3" = "Tertiary")) %>%
+  ggboxplot(., x = "Piracy_use", y = "content_avail",
+          color = "Education", palette = c("#233d4d", "#fe7f2d","#fcca46"),
+        ylab = "Content Availability", xlab = "Piracy Use")  + theme_stata() + ggtitle("Content Availability - Education - Piracy Use") 
+```
+#### T.Test
+```{r}
+
+## Variance
+piracy.df %>%
+  filter(Education == 1) %>%
+  var.test(content_avail ~ Piracy_use, data = .)
+
+piracy.df %>%
+  filter(Education == 2) %>%
+  var.test(content_avail ~ Piracy_use, data = .)
+
+piracy.df %>%
+  filter(Education == 3) %>%
+  var.test(content_avail ~ Piracy_use, data = .)
+
+## Actual Test
+
+piracy.df %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = TRUE)
+
+piracy.df %>%
+  filter(Education == 1) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = TRUE)
+
+piracy.df %>%
+  filter(Education == 2) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = TRUE)
+
+piracy.df %>%
+  filter(Education == 3) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = FALSE)
+
+
+## Further Tests
+
+piracy.df %>%
+  filter(Education == 1) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = FALSE, alternative = "greater")
+
+piracy.df %>%
+  filter(Education == 3) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = FALSE, alternative = "less")
+```
+When looking specifically at individuals that have a primary education, there is a difference between the amount of content piraters and non-piraters are. Non-piraters on average have access to more content than pirates
+
+When looking specifically at individuals that have a tertiary education, there is a difference between the amount of content piraters and non-piraters are. Non-pirates on average has access to less content that pirates
+
+
+### Difference in Means between Piracy and Non-Piracy between the Age
+
+#### Boxplot
+
+```{r}
+
+piracy.df %>%
+  mutate(Piracy_use = recode_factor(Piracy_use, "1" = "Pirate", "0" = "Non-Pirate")) %>%
+  mutate(Age = as.factor(Age)) %>%
+  mutate(Age = recode_factor(Age, "1" = "16-30", "2" = "31-40", "3" = "41-50", "4" = "51+")) %>%
+  ggboxplot(., x = "Piracy_use", y = "content_avail",
+          color = "Age", palette = c("#efd6ac", "#e07a5f","#3d405b","#81b29a"),
+        ylab = "Content Availability", xlab = "Piracy Use")  + theme_stata() + ggtitle("Content Availability - Age - Piracy Use") 
+
+```
+
+#### T.Test
+
+```{r}
+
+## Variance
+piracy.df %>%
+  filter(Age == 1) %>%
+  var.test(content_avail ~ Piracy_use, data = .)
+
+piracy.df %>%
+  filter(Age == 2) %>%
+  var.test(content_avail ~ Piracy_use, data = .)
+
+piracy.df %>%
+  filter(Age == 3) %>%
+  var.test(content_avail ~ Piracy_use, data = .)
+
+piracy.df %>%
+  filter(Age == 4) %>%
+  var.test(content_avail ~ Piracy_use, data = .)
+
+## Actual Test
+
+piracy.df %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = TRUE)
+
+piracy.df %>%
+  filter(Age == 1) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = TRUE)
+
+piracy.df %>%
+  filter(Age == 2) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = FALSE)
+
+piracy.df %>%
+  filter(Age == 3) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = FALSE)
+
+piracy.df %>%
+  filter(Age == 4) %>%
+  t.test(content_avail ~ Piracy_use, data = ., var.equal = FALSE)
+
+```
+
+# Platform Usage
+
+## Number of Users per Platform
+
+```{r}
+
+content.df %>%
+  arrange(NumUsers) %>%
+  mutate(provider = factor(provider, levels=provider)) %>%
+  ggplot(aes(x=provider, y=NumUsers, fill = provider, label = NumUsers)) + 
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  ylab("") +
+  xlab("Platforms") +
+  ggtitle("Number of Users per Platform") + theme_stata() +  theme(axis.text.y = element_text(angle = 0, hjust = 1)) + 
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5)) + geom_label()
+
+
+```
+
+
+
+## Proportion of Piraters per Platform
+
+```{r}
+content.df %>%
+  filter(NumUsers > 0) %>%
+  arrange(PiratingUsers/NumUsers) %>%
+  mutate(provider = factor(provider, levels=provider)) %>%
+  ggplot(aes(x=provider, y=PiratingUsers/NumUsers, fill = provider, label=round(PiratingUsers/NumUsers,2))) + 
+  geom_bar(stat = "identity") +  scale_fill_brewer(palette = "Paired") +
+  coord_flip() +
+  ylab("") +
+  xlab("Platforms") +
+  ggtitle("Proportion of Users per Platform that Pirate") + 
+  theme_stata() + 
+  theme(axis.text.y = element_text(angle = 0, hjust = 1)) + 
+  geom_label() +
+  theme(legend.position="none", plot.title = element_text(hjust = 0.5)) 
+```
+
+
+```{r}
+top10factors <- piracy_factor %>%
+  select(allplatforms) %>%
+  group_by(allplatforms) %>%
+  summarise(count = n()) %>%
+  filter(count >= 20) %>%
+  arrange(desc(count)) %>%
+  select(allplatforms) %>%
+  as.vector(.)
+```
+
+
+```{r}
+atleast5factors <- piracy_factor %>%
+  select(allplatforms, Piracy_use) %>%
+  group_by(allplatforms, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  filter(`Non-Pirate` > 4 & Pirate > 4) %>%
+  select(allplatforms) %>%
+  as.vector(.)
+```
+
+
+## Chi Squared Test
+```{r}
+## All Rows
+chisq.test(piracy_factor$allplatforms, piracy_factor$Piracy_use, simulate.p.value = TRUE)
+
+# Filtered Rows
+temp <- piracy_factor %>%
+  filter(allplatforms %in% top10factors$allplatforms)
+
+chisq.test(temp$allplatforms, temp$Piracy_use)
+
+rm(temp)
+
+# At Least 5 factors
+
+temp <- piracy_factor %>%
+  filter(allplatforms %in% atleast5factors$allplatforms)
+
+chisq.test(temp$allplatforms, temp$Piracy_use)
+
+rm(temp)
+        
+```
+
+## Proportion Table - Just Platforms
+```{r}
+p <- piracy_factor %>%
+  filter(allplatforms %in% top10factors$allplatforms) %>%
+  select(allplatforms) %>%
+  mutate(allplatforms = as.factor(allplatforms)) %>% 
+  table(.) %>%
+  prop.table(.)
+
+temp <- as.data.frame(p)
+
+p <- temp %>%
+  group_by(allplatforms) %>%
+  summarise(`Proportion of Participants` = sum(Freq)) %>%
+  ggplot(.) +
+  geom_bar(aes(x = reorder(allplatforms, `Proportion of Participants`), y = `Proportion of Participants`, fill = allplatforms,
+               text = paste0(
+                 "Proportion: ", round(`Proportion of Participants`, 3),
+                 "<br>",
+                 "Platform Combination: ", allplatforms)), 
+           stat = "identity", show.legend = FALSE) + 
+  coord_flip() + xlab("Platform Combinations") + ggtitle("Proportion of Participants Subscribed to Platform Combinations") +
+  theme_stata() + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + theme(legend.position="none") 
+
+ggplotly(p, tooltip = "text")
+
+temp %>%
+  rename(`Proportion of Participants` = Freq) %>%
+  rename(`Platform Combinations` = allplatforms) %>%
+  arrange(desc(`Proportion of Participants`)) %>%
+  mutate(`Proportion of Participants` = round(`Proportion of Participants`, 3)) %>%
+  reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+  #adjust table font
+  theme = reactableTheme( style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+rm(temp)
+
+```
+
+
+## Proportion Table - Row Wise
+
+```{r}
+temp <- piracy_factor %>%
+  filter(allplatforms %in% top10factors$allplatforms) %>%
+  select(Piracy_use, allplatforms) %>%
+  mutate(Piracy_use = as.factor(Piracy_use)) %>%
+  mutate(allplatforms = as.factor(allplatforms)) %>% 
+  table(.)
+
+temp <- as.data.frame(prop.table(temp,2))
+
+temp <- temp %>%
+  mutate(content_avail = case_when(
+    allplatforms == "Netflix" ~ 3411,
+    allplatforms == "Amazon" ~ 3920,
+    allplatforms == "Netflix, Amazon" ~ 7311,
+    allplatforms == "Netflix, HboMax, Amazon, Disney" ~ 9907,
+    allplatforms == "Netflix, Amazon, Disney" ~ 8973,
+    allplatforms == "Netflix, HboMax, Amazon" ~ 8265,
+    allplatforms == "Netflix, Disney" ~ 5053,
+    allplatforms == "Non" ~ 0,
+    allplatforms == "Amazon, Disney" ~ 5562,
+    allplatforms == "Netflix, HboMax, Amazon, Disney, Apple" ~ 17544
+  ))
+
+
+```
+
+
+```{r}
+
+p <- temp %>%
+  arrange(desc(content_avail)) %>%
+  ggplot(., aes(x = allplatforms, y = Freq, fill = Piracy_use,
+                text = paste0(
+                "Proportion: ", round(Freq, 3),
+                "<br>",
+                "Content Availability: ", content_avail,
+                "<br>",
+                "Platform Combination: ", allplatforms))) +
+  geom_bar(stat = "identity", position=position_dodge()) + coord_flip() +
+  xlab("Platform Combinations") + ylab("Proportion of Participants") +
+  theme_stata() + theme(axis.text.y = element_text(angle = 0, hjust = 1)) +
+  ggtitle("Proportion of Piracy per Platform Combinations") + scale_fill_manual(values=c("#E7B800", "#00AFBB")) +
+  labs(fill = "Piracy Use")
+
+ggplotly(p, tooltip = "text")
+
+
+temp %>%
+  rename(`Platform Combinations` = allplatforms) %>%
+  pivot_wider(values_from = Freq, names_from = Piracy_use) %>%
+  mutate(Pirate = round(Pirate, 3)) %>%
+  mutate(`Non-Pirate` = round(`Non-Pirate`, 3)) %>%
+  reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+  #adjust table font
+  theme = reactableTheme( style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+```
+
+
+
+## Sex & Platform Combination
+
+### Chi Squared Test 
+
+```{r}
+chisq.test(piracy_factor$allplatforms, piracy_factor$Sex, simulate.p.value = TRUE)
+```
+No relationship between Sex and Platforms Subscribed to
+
+## Age & Platform Combination
+
+### Chi Squared Test 
+
+```{r}
+temp <- piracy_factor %>%
+  filter(allplatforms %in% top10factors$allplatforms) 
+chisq.test(temp$allplatforms, temp$Age, simulate.p.value = TRUE)
+```
+There is a relationship between age and the platforms people use
+
+
+### Plotting
+
+```{r}
+
+piracy_factor %>%
+  filter(allplatforms == "Amazon") %>%
+  select(allplatforms, Age, Piracy_use) %>%
+  group_by(allplatforms, Age, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Non-Pirate` = ifelse(is.na(`Non-Pirate`),0,`Non-Pirate`)) %>%
+  mutate(Pirate = ifelse(is.na(Pirate),0,Pirate)) %>%
+  mutate(`Proportion of Pirates` = as.numeric(round(Pirate/(Pirate+`Non-Pirate`),2))) %>%
+  mutate(`Proportion of Non-Pirates` = as.numeric(round(`Non-Pirate`/(Pirate+`Non-Pirate`),2))) %>%
+  select(allplatforms, Age, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  group_by(allplatforms) %>%
+  reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+          columns = list( 
+            allplatforms = colDef(name = "Platform Combinations",
+                                  minWidth = 100),
+            Age = colDef(minWidth = 50),
+            `Proportion of Pirates` = colDef(minWidth = 100),
+            `Proportion of Non-Pirates` = colDef(minWidth = 100)),
+  #adjust table font
+  theme = reactableTheme( style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy_factor %>%
+  filter(allplatforms %in% top10factors$allplatforms) %>%
+  select(allplatforms, Age, Piracy_use) %>%
+  group_by(allplatforms, Age, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Non-Pirate` = ifelse(is.na(`Non-Pirate`),0,`Non-Pirate`)) %>%
+  mutate(Pirate = ifelse(is.na(Pirate),0,Pirate)) %>%
+  mutate(PP = Pirate/(Pirate+`Non-Pirate`)) %>%
+  mutate(PNP = `Non-Pirate`/(Pirate+`Non-Pirate`)) %>%
+  select(allplatforms, Age, PP, PNP) %>%
+  pivot_longer(cols = c('PP','PNP'),
+               names_to = "Piracy Use",
+               values_to = "Proportion of Participants") %>%
+  ggplot(., aes(x = allplatforms, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_bar(stat = "identity", position=position_dodge()) + coord_flip() + facet_wrap(~Age, dir = "v") + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) 
+
+
+  
+piracy_factor %>%
+  filter(allplatforms %in% top10factors$allplatforms) %>%
+  select(allplatforms, Age, Piracy_use) %>%
+  group_by(allplatforms, Age, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Non-Pirate` = ifelse(is.na(`Non-Pirate`),0,`Non-Pirate`)) %>%
+  mutate(Pirate = ifelse(is.na(Pirate),0,Pirate)) %>%
+  mutate(PP = Pirate/(Pirate+`Non-Pirate`)) %>%
+  mutate(PNP = `Non-Pirate`/(Pirate+`Non-Pirate`)) %>%
+  select(allplatforms, Age, PP, PNP) %>%
+  pivot_longer(cols = c('PP','PNP'),
+               names_to = "Piracy Use",
+               values_to = "Proportion of Participants") %>%
+  ggplot(., aes(x = Age, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_bar(stat = "identity", position=position_dodge()) + coord_flip() + facet_wrap(~allplatforms, dir = "v") + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1))
+
+
+```
+
+
+
+
+## Education & Platform Combination
+
+### Chi Squared Test 
+
+```{r}
+chisq.test(piracy_factor$allplatforms, piracy_factor$Education, simulate.p.value = TRUE)
+```
+There is no relationship between education and platforms people use
+
+
+# Age
+
+## Chi Squared Test
+```{r}
+chisq.test(piracy.df$Age, piracy.df$Piracy_use)
+```
+Is a relationship between age and piracy
+
+
+## Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Age, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+
+
+## Plotting
+```{r}
+piracy_factor %>%
+  select(Age, Piracy_use) %>%
+  group_by(Age, Piracy_use) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Non-Pirate` = ifelse(is.na(`Non-Pirate`), 0, `Non-Pirate`)) %>%
+  mutate(Pirate = ifelse(is.na(Pirate), 0, Pirate)) %>%
+  mutate(Total = Pirate + `Non-Pirate`) %>%
+  mutate(`Proportion of Pirates` = round(Pirate / Total, 2)) %>%
+  mutate(`Proportion of Non-Pirates` = round(`Non-Pirate` / Total, 2)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Age Group` = round(Total / Total_All, 2)) %>%
+  select(Age, `Proportion of Pirates`, `Proportion of Non-Pirates`,`Proportion of Age Group`) %>%
+  reactable(
+    .,
+    highlight = TRUE,
+    bordered = TRUE,
+    striped = TRUE,
+    compact = TRUE,
+    columns = list(
+      Age = colDef(minWidth = 50),
+      `Proportion of Pirates` = colDef(minWidth = 100),
+      `Proportion of Non-Pirates` = colDef(minWidth = 100),
+      `Proportion of Age Group` = colDef(minWidth = 100)
+    ),
+    theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+
+p <- piracy_factor %>%
+  select(Age, Piracy_use) %>%
+  group_by(Age, Piracy_use) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Non-Pirate` = ifelse(is.na(`Non-Pirate`), 0, `Non-Pirate`)) %>%
+  mutate(Pirate = ifelse(is.na(Pirate), 0, Pirate)) %>%
+  mutate(Total = Pirate + `Non-Pirate`) %>%
+  mutate(`Proportion of Pirates` = round(Pirate / Total, 2)) %>%
+  mutate(`Proportion of Non-Pirates` = round(`Non-Pirate` / Total, 2)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Age Group` = round(Total / Total_All, 2)) %>%
+  select(Age, `Proportion of Pirates`, `Proportion of Age Group`) %>%
+  arrange(`Proportion of Age Group`) %>%
+  ggplot(., aes(x = Age, y = `Proportion of Pirates`, fill = Age,
+                text = paste0(
+                "Proportion of Pirates per Age Group: ", round(`Proportion of Pirates`, 3),
+                "<br>",
+                "Proportion of Demographic: ", `Proportion of Age Group`,
+                "<br>",
+                "Age Group: ", Age))) +
+  geom_bar(stat = "identity", position=position_dodge()) + coord_flip() +
+  xlab("Age Group") + ylab("Proportion of Participants") +
+  theme_stata() + theme(axis.text.y = element_text(angle = 0, hjust = 1)) +
+  ggtitle("Proportion of Pirates per Age Group") 
+
+ggplotly(p, tooltip = "text")
+  
+
+```
+
+# Education
+
+## Chi Squared Test
+
+```{r}
+chisq.test(piracy.df$Education, piracy.df$Piracy_use)
+```
+
+## Table
+```{r}
+
+piracy_factor %>%
+  select(Education, Piracy_use) %>%
+  group_by(Education, Piracy_use) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = Pirate + `Non-Pirate`) %>%
+  mutate(`Proportion of Pirates` = round(Pirate / Total, 2)) %>%
+  mutate(`Proportion of Non-Pirates` = round(`Non-Pirate` / Total, 2)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,2)) %>%
+  select(Education, `Proportion of Pirates`, `Proportion of Non-Pirates`, `Proportion of Demographic`) %>%
+  reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+          columns = list( 
+            Education = colDef(minWidth = 50),
+            `Proportion of Demographic` = colDef(minWidth = 100),
+            `Proportion of Pirates` = colDef(minWidth = 100),
+            `Proportion of Non-Pirates` = colDef(minWidth = 100)),
+  #adjust table font
+  theme = reactableTheme( style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+  
+```
+
+
+## Graph
+```{r}
+piracy_factor %>%
+  select(Education, Piracy_use) %>%
+  group_by(Education, Piracy_use) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = Pirate + `Non-Pirate`) %>%
+  mutate(`Proportion of Pirates` = round(Pirate / Total, 2)) %>%
+  mutate(`Proportion of Non-Pirates` = round(`Non-Pirate` / Total, 2)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,2)) %>%
+  select(Education, `Proportion of Pirates`, `Proportion of Non-Pirates`, `Proportion of Demographic`) %>%
+  ggplot(., aes(x = Education, y = `Proportion of Demographic`, label = round(`Proportion of Demographic`,2), fill=Education)) + 
+    geom_bar(stat = "identity", position=position_dodge()) + coord_flip() +
+    xlab("Education") + ylab("Proportion of Participants") +
+  theme_stata() + theme(axis.text.y = element_text(angle = 0, hjust = 1)) +
+  ggtitle("Proportion of Participants per Education Level") + scale_fill_manual(values=c("#233d4d", "#fe7f2d","#fcca46")) + labs(fill = "Piracy Use") + geom_label()
+
+```
+
+## Graph Facets
+
+```{r}
+piracy_factor %>%
+  select(Education, Piracy_use) %>%
+  group_by(Education, Piracy_use) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = Pirate + `Non-Pirate`) %>%
+  mutate(`Proportion of Pirates` = round(Pirate / Total, 2)) %>%
+  mutate(`Proportion of Non-Pirates` = round(`Non-Pirate` / Total, 2)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,2)) %>%
+  select(Education, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+               names_to = "Piracy Use", 
+               values_to = "Proportion of Participants") %>%
+  mutate(`Piracy Use` = recode_factor(`Piracy Use`, "Proportion of Pirates" = "Pirate", "Proportion of Non-Pirates" = "Non-Pirates")) %>%
+  ggplot(., aes(x = Education, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_bar(stat = "identity", position=position_dodge()) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Education Level")
+# 
+# 
+#   
+# piracy_factor %>%
+#   filter(allplatforms %in% top10factors$allplatforms) %>%
+#   select(allplatforms, Age, Piracy_use) %>%
+#   group_by(allplatforms, Age, Piracy_use) %>%
+#   summarise(count = n()) %>%
+#   pivot_wider(values_from = count, names_from = Piracy_use) %>%
+#   mutate(`Non-Pirate` = ifelse(is.na(`Non-Pirate`),0,`Non-Pirate`)) %>%
+#   mutate(Pirate = ifelse(is.na(Pirate),0,Pirate)) %>%
+#   mutate(PP = Pirate/(Pirate+`Non-Pirate`)) %>%
+#   mutate(PNP = `Non-Pirate`/(Pirate+`Non-Pirate`)) %>%
+#   select(allplatforms, Age, PP, PNP) %>%
+#   pivot_longer(cols = c('PP','PNP'),
+#                names_to = "Piracy Use",
+#                values_to = "Proportion of Participants") %>%
+#   ggplot(., aes(x = Age, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_bar(stat = "identity", position=position_dodge()) + coord_flip() + facet_wrap(~allplatforms, dir = "v") + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1))
+```
+
+
+# Sex
+
+## Chi Squared Test
+```{r}
+chisq.test(piracy.df$Sex, piracy.df$Piracy_use)
+```
+## Plotting
+```{r}
+
+## Pirates 
+piracy.df %>%
+  select(Sex, Piracy_use) %>%
+  mutate(Sex = as.factor(Sex)) %>%
+  group_by(Sex) %>%
+  count(Piracy_use) %>%
+  mutate(Piracy_use = case_when(
+    Piracy_use == 1 ~ "Pirate",
+    Piracy_use == 0 ~ "NonPirate"
+  )) %>%
+    mutate(Sex = case_when(
+    Sex == 1 ~ "Male",
+    Sex == 2 ~ "Female"
+  )) %>%
+  pivot_wider(names_from = Piracy_use, values_from = n) %>%
+  mutate(prop_pirate = Pirate/(Pirate+NonPirate))  %>%
+  ggplot(.) + geom_bar(aes(x = Sex, y = prop_pirate, fill = Sex), stat="identity", position="dodge", na.rm=TRUE) + ggtitle("Proportional Piracy by Sex") + ylab("Proportion of Piraters")  + xlab("Sex") +  theme(legend.position="none", plot.title = element_text(hjust = 0.5)) 
+
+##Non Pirates
+piracy.df %>%
+  select(Sex, Piracy_use) %>%
+  mutate(Sex = as.factor(Sex)) %>%
+  group_by(Sex) %>%
+  count(Piracy_use) %>%
+  mutate(Piracy_use = case_when(
+    Piracy_use == 1 ~ "Pirate",
+    Piracy_use == 0 ~ "NonPirate"
+  )) %>%
+    mutate(Sex = case_when(
+    Sex == 1 ~ "Male",
+    Sex == 2 ~ "Female"
+  )) %>%
+  pivot_wider(names_from = Piracy_use, values_from = n) %>%
+  mutate(prop_pirate = NonPirate/(Pirate+NonPirate))  %>%
+  ggplot(.) + geom_bar(aes(x = Sex, y = prop_pirate, fill = Sex), stat="identity", position="dodge", na.rm=TRUE) + ggtitle("Proportional Non-Piracy by Sex") + ylab("Proportion of Non-Piraters")  + xlab("Sex") +  theme(legend.position="none", plot.title = element_text(hjust = 0.5)) 
+
+#Pirates and Non-Pirates
+piracy_factor %>%
+  select(Sex, Piracy_use) %>%
+  group_by(Sex, Piracy_use) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = Pirate + `Non-Pirate`) %>%
+  mutate(`Proportion of Pirates` = round(Pirate / Total, 2)) %>%
+  mutate(`Proportion of Non-Pirates` = round(`Non-Pirate` / Total, 2)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,2)) %>%
+  select(Sex, `Proportion of Pirates`, `Proportion of Non-Pirates`, `Proportion of Demographic`) %>%
+  ggplot(., aes(x = Sex, y = `Proportion of Demographic`, label = round(`Proportion of Demographic`,2), fill=Sex)) + 
+    geom_bar(stat = "identity", position=position_dodge()) + coord_flip() +
+    xlab("Sex") + ylab("Proportion of Participants") +
+  theme_stata() + theme(axis.text.y = element_text(angle = 0, hjust = 1)) +
+  ggtitle("Proportion of Participants per Sex Level") + scale_fill_manual(values=c("#6F8FAF", "#FFC0CB")) + labs(fill = "Piracy Use") + geom_label()
+
+
+##ggplotly
+p <- piracy_factor %>%
+  select(Sex, Piracy_use) %>%
+  group_by(Sex, Piracy_use) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = Pirate + `Non-Pirate`) %>%
+  mutate(`Proportion of Pirates` = round(Pirate / Total, 2)) %>%
+  mutate(`Proportion of Non-Pirates` = round(`Non-Pirate` / Total, 2)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,2)) %>%
+  select(Sex, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+               names_to = "Piracy Use", 
+               values_to = "Proportion of Participants") %>%
+  mutate(`Piracy Use` = recode_factor(`Piracy Use`, "Proportion of Pirates" = "Pirate", "Proportion of Non-Pirates" = "Non-Pirates")) %>%
+  ggplot(., aes(x = Sex, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_bar(stat = "identity", position=position_dodge()) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level")
+
+ggplotly(p)
+```
+
+## Tables
+```{r}
+piracy_factor %>%
+  select(Sex, Piracy_use) %>%
+  group_by(Sex, Piracy_use) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = Pirate + `Non-Pirate`) %>%
+  mutate(`Proportion of Pirates` = round(Pirate / Total, 2)) %>%
+  mutate(`Proportion of Non-Pirates` = round(`Non-Pirate` / Total, 2)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,2)) %>%
+  select(Sex, `Proportion of Pirates`, `Proportion of Non-Pirates`, `Proportion of Demographic`) %>%
+  reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+          columns = list( 
+            Sex = colDef(minWidth = 50),
+            `Proportion of Demographic` = colDef(minWidth = 100),
+            `Proportion of Pirates` = colDef(minWidth = 100),
+            `Proportion of Non-Pirates` = colDef(minWidth = 100)),
+  #adjust table font
+  theme = reactableTheme( style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+```
+
+# Genres
+
+## Action
+
+### Stats
+```{r}
+
+chisq.test(piracy.df$Interest_Action, piracy.df$Piracy_use)
+
+piracy.df %>%
+  select(Interest_Action, Piracy_use) %>%
+  mutate(Interest_Action = ifelse(Interest_Action == 4 | Interest_Action == 5, "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+
+
+```
+No statistically significant relationship between interest in Action and Piracy. 
+
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Action, Piracy_use) %>%
+  mutate(Interest_Action = ifelse(Interest_Action == 4 | Interest_Action == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+### Plotting
+```{r}
+piracy.df %>%
+  select(Interest_Action, Piracy_use) %>%
+  mutate(Interest_Action = as.factor(Interest_Action)) %>%
+  group_by(Interest_Action, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Action,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Action, Piracy_use) %>%
+  mutate(Interest_Action = as.factor(Interest_Action)) %>%
+  group_by(Interest_Action, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Action, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Action, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+
+```{r}
+table(piracy.df$Interest_Action)
+```
+
+
+## Comedy
+
+```{r}
+table(piracy.df$Interest_Comedy)
+```
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Comedy, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Comedy, Piracy_use) %>%
+  mutate(Interest_Comedy = ifelse(Interest_Comedy == 4 | Interest_Comedy == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+```
+
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Comedy, Piracy_use) %>%
+  mutate(Interest_Comedy = as.factor(Interest_Comedy)) %>%
+  group_by(Interest_Comedy, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Comedy,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Comedy, Piracy_use) %>%
+  mutate(Interest_Comedy = as.factor(Interest_Comedy)) %>%
+  group_by(Interest_Comedy, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Comedy, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Comedy, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+
+### Stats
+
+```{r}
+chisq.test(piracy.df$Interest_Comedy, piracy.df$Piracy_use)
+
+
+piracy.df %>%
+  select(Interest_Comedy, Piracy_use) %>%
+  mutate(Interest_Comedy = ifelse(Interest_Comedy == 4 | Interest_Comedy == 5, "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+```
+No relationship between comedy and piracy
+
+
+## Disaster
+
+### Stats
+
+```{r}
+table(piracy.df$Interest_Disaster)
+
+temp <- piracy.df %>%
+  filter(Interest_Disaster != 1) 
+
+chisq.test(temp$Interest_Disaster, temp$Piracy_use, simulate.p.value = TRUE)
+
+rm(temp)
+
+piracy.df %>%
+  select(Interest_Disaster, Piracy_use) %>%
+  mutate(Interest_Disaster = ifelse(Interest_Disaster == 4 | Interest_Disaster == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+
+```
+There is a relationship between disaster and piracy when 
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Disaster, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Disaster, Piracy_use) %>%
+  mutate(Interest_Disaster = ifelse(Interest_Disaster == 4 | Interest_Disaster == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Disaster, Piracy_use) %>%
+  mutate(Interest_Disaster = as.factor(Interest_Disaster)) %>%
+  group_by(Interest_Disaster, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Disaster,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Disaster, Piracy_use) %>%
+  mutate(Interest_Disaster = as.factor(Interest_Disaster)) %>%
+  group_by(Interest_Disaster, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Disaster, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Disaster, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+
+```
+## Documentary
+
+### Stats
+
+```{r}
+table(piracy.df$Interest_Documentary)
+```
+
+
+```{r}
+
+temp <- piracy.df %>%
+  filter(Interest_Documentary != 1) 
+
+chisq.test(temp$Interest_Documentary, temp$Piracy_use, simulate.p.value = TRUE)
+
+rm(temp)
+
+piracy.df %>%
+  select(Interest_Documentary, Piracy_use) %>%
+  mutate(Interest_Documentary = ifelse(Interest_Documentary == 4 | Interest_Documentary == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+  
+```
+
+
+There is no relationship between documentary and piracy 
+
+
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Documentary, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Documentary, Piracy_use) %>%
+  mutate(Interest_Documentary = ifelse(Interest_Documentary == 4 | Interest_Documentary == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Documentary, Piracy_use) %>%
+  mutate(Interest_Documentary = as.factor(Interest_Documentary)) %>%
+  group_by(Interest_Documentary, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Documentary,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Documentary, Piracy_use) %>%
+  mutate(Interest_Documentary = as.factor(Interest_Documentary)) %>%
+  group_by(Interest_Documentary, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Documentary, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Documentary, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+
+
+
+## Drama
+
+### Stats
+
+```{r}
+table(piracy.df$Interest_Drama)
+```
+
+
+```{r}
+
+chisq.test(piracy.df$Interest_Drama, piracy.df$Piracy_use)
+
+piracy.df %>%
+  select(Interest_Drama, Piracy_use) %>%
+  mutate(Interest_Drama = ifelse(Interest_Drama == 4 | Interest_Drama == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+  
+```
+
+
+There is no relationship between drama and piracy 
+
+
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Drama, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Drama, Piracy_use) %>%
+  mutate(Interest_Drama = ifelse(Interest_Drama == 4 | Interest_Drama == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Drama, Piracy_use) %>%
+  mutate(Interest_Drama = as.factor(Interest_Drama)) %>%
+  group_by(Interest_Drama, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Drama,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Drama, Piracy_use) %>%
+  mutate(Interest_Drama = as.factor(Interest_Drama)) %>%
+  group_by(Interest_Drama, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Drama, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Drama, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+
+## Family
+
+### Stats
+
+```{r}
+table(piracy.df$Interest_Family)
+```
+
+
+```{r}
+
+temp <- piracy.df %>%
+  filter(Interest_Family != 1) 
+
+chisq.test(temp$Interest_Family, temp$Piracy_use, simulate.p.value = TRUE)
+
+rm(temp)
+
+piracy.df %>%
+  select(Interest_Family, Piracy_use) %>%
+  mutate(Interest_Family = ifelse(Interest_Family == 4 | Interest_Family == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+  
+```
+
+
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Family, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Family, Piracy_use) %>%
+  mutate(Interest_Family = ifelse(Interest_Family == 4 | Interest_Family == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Family, Piracy_use) %>%
+  mutate(Interest_Family = as.factor(Interest_Family)) %>%
+  group_by(Interest_Family, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Family,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Family, Piracy_use) %>%
+  mutate(Interest_Family = as.factor(Interest_Family)) %>%
+  group_by(Interest_Family, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Family, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Family, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+
+
+## Fantasy
+
+### Stats
+
+```{r}
+table(piracy.df$Interest_Fantasy)
+```
+
+
+```{r}
+chisq.test(piracy.df$Interest_Fantasy, piracy.df$Piracy_use)
+
+piracy.df %>%
+  select(Interest_Fantasy, Piracy_use) %>%
+  mutate(Interest_Fantasy = ifelse(Interest_Fantasy == 4 | Interest_Fantasy == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+  
+```
+
+
+There is no relationship between documentary and piracy 
+
+
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Fantasy, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Fantasy, Piracy_use) %>%
+  mutate(Interest_Fantasy = ifelse(Interest_Fantasy == 4 | Interest_Fantasy == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Fantasy, Piracy_use) %>%
+  mutate(Interest_Fantasy = as.factor(Interest_Fantasy)) %>%
+  group_by(Interest_Fantasy, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Fantasy,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Fantasy, Piracy_use) %>%
+  mutate(Interest_Fantasy = as.factor(Interest_Fantasy)) %>%
+  group_by(Interest_Fantasy, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Fantasy, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Fantasy, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+
+
+## Period
+
+### Stats
+
+```{r}
+table(piracy.df$Interest_Period)
+```
+
+
+```{r}
+
+temp <- piracy.df %>%
+  filter(Interest_Period != 1) 
+
+chisq.test(temp$Interest_Period, temp$Piracy_use, simulate.p.value = TRUE)
+
+rm(temp)
+
+piracy.df %>%
+  select(Interest_Period, Piracy_use) %>%
+  mutate(Interest_Period = ifelse(Interest_Period == 4 | Interest_Period == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+  
+```
+
+
+There is no relationship between documentary and piracy 
+
+
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Period, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Period, Piracy_use) %>%
+  mutate(Interest_Period = ifelse(Interest_Period == 4 | Interest_Period == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Period, Piracy_use) %>%
+  mutate(Interest_Period = as.factor(Interest_Period)) %>%
+  group_by(Interest_Period, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Period,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Period, Piracy_use) %>%
+  mutate(Interest_Period = as.factor(Interest_Period)) %>%
+  group_by(Interest_Period, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Period, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Period, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+
+## Romance
+
+### Stats
+
+```{r}
+table(piracy.df$Interest_Romance)
+```
+
+
+```{r}
+
+temp <- piracy.df %>%
+  filter(Interest_Romance != 1) 
+
+chisq.test(temp$Interest_Romance, temp$Piracy_use, simulate.p.value = TRUE)
+
+rm(temp)
+
+piracy.df %>%
+  select(Interest_Romance, Piracy_use) %>%
+  mutate(Interest_Romance = ifelse(Interest_Romance == 4 | Interest_Romance == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+  
+```
+
+There is an association between interest in Romance and Piracy
+
+High Interest in Romance are less likely to use piracy (odds are about 0.5 of those who have a lower interest in Romance)
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Romance, Piracy_use) %>%
+  filter(Interest_Romance != 1) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Romance, Piracy_use) %>%
+  mutate(Interest_Romance = ifelse(Interest_Romance == 4 | Interest_Romance == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Romance, Piracy_use) %>%
+  mutate(Interest_Romance = as.factor(Interest_Romance)) %>%
+  group_by(Interest_Romance, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Romance,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Romance, Piracy_use) %>%
+  mutate(Interest_Romance = as.factor(Interest_Romance)) %>%
+  group_by(Interest_Romance, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Romance, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Romance, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+
+### Demographics
+
+
+#### Age
+```{r}
+table(piracy.df$Interest_Romance, piracy.df$Age)
+```
+
+```{r}
+temp <- piracy.df %>%
+  filter(Interest_Romance != 1) %>%
+  filter(Interest_Romance != 2 & Age != 4) %>%
+  filter(Interest_Romance != 3 & Age != 3) %>%
+  filter(Interest_Romance != 3 & Age != 4) 
+
+
+chisq.test(temp$Interest_Romance, temp$Age, simulate.p.value = TRUE)
+
+rm(temp)
+
+piracy.df %>%
+  select(Interest_Romance, Age) %>%
+  mutate(Interest_Romance = ifelse(Interest_Romance == 4 | Interest_Romance == 5 , "High", "Low")) %>%
+  mutate(Age = ifelse(Age == 1 | Age == 2 , "Younger", "Older")) %>%
+  table(.) %>%
+  fisher.test(.)
+```
+
+The odds of younger people having a high interest in romance is about 60% lower than older people
+
+#### Sex
+```{r}
+table(piracy.df$Interest_Romance, piracy.df$Sex)
+```
+
+```{r}
+# temp <- piracy.df %>%
+#   filter(Interest_Romance != 1) %>%
+#   filter(Interest_Romance != 2 & Age != 4) %>%
+#   filter(Interest_Romance != 3 & Age != 3) %>%
+#   filter(Interest_Romance != 3 & Age != 4) 
+# 
+# 
+# chisq.test(temp$Interest_Romance, temp$Age, simulate.p.value = TRUE)
+# 
+# rm(temp)
+
+piracy.df %>%
+  select(Interest_Romance, Sex) %>%
+  mutate(Interest_Romance = ifelse(Interest_Romance == 4 | Interest_Romance == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+```
+
+The odds of men people having a high interest in romance is about 82% lower than women 
+
+#### Education
+```{r}
+table(piracy.df$Interest_Romance, piracy.df$Education)
+```
+
+```{r}
+
+piracy.df %>%
+  select(Education, Interest_Romance) %>%
+  mutate(Interest_Romance = ifelse(Interest_Romance == 4 | Interest_Romance == 5, "High", "Low")) %>%
+  group_by(Education, Interest_Romance) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(values_from = count, names_from = Interest_Romance) %>%
+  mutate(Sum_High = sum(High, na.rm = TRUE), Sum_Low = sum(Low, na.rm = TRUE)) %>%
+  mutate(propLow = Low/Sum_Low) %>%
+  mutate(propHigh = High/Sum_High) %>%
+  select(Education, propLow, propHigh)
+
+
+
+temp <- piracy.df %>%
+  filter(Interest_Romance != 1) %>%
+  filter(Interest_Romance != 2 & Education != 4) %>%
+  filter(Interest_Romance != 3 & Age != 3) %>%
+  filter(Interest_Romance != 3 & Age != 4)
+
+
+chisq.test(temp$Interest_Romance, temp$Age, simulate.p.value = TRUE)
+
+rm(temp)
+
+piracy.df %>%
+  select(Interest_Romance, Education) %>%
+  mutate(Interest_Romance = ifelse(Interest_Romance == 4 | Interest_Romance == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+```
+
+The odds of younger people having a high interest in romance is about 60% lower than older people
+
+## Science Fiction
+
+### Stats
+
+```{r}
+table(piracy.df$Interest_Science_fiction)
+```
+
+
+```{r}
+
+chisq.test(piracy.df$Interest_Science_fiction, piracy.df$Piracy_use, simulate.p.value = TRUE)
+
+
+piracy.df %>%
+  select(Interest_Science_fiction, Piracy_use) %>%
+  mutate(Interest_Science_fiction = ifelse(Interest_Science_fiction == 4 | Interest_Science_fiction == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+  
+```
+
+
+There is no relationship between documentary and piracy 
+
+
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Science_fiction, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Science_fiction, Piracy_use) %>%
+  mutate(Interest_Science_fiction = ifelse(Interest_Science_fiction == 4 | Interest_Science_fiction == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Science_fiction, Piracy_use) %>%
+  mutate(Interest_Science_fiction = as.factor(Interest_Science_fiction)) %>%
+  group_by(Interest_Science_fiction, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Science_fiction,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Science_fiction, Piracy_use) %>%
+  mutate(Interest_Science_fiction = as.factor(Interest_Science_fiction)) %>%
+  group_by(Interest_Science_fiction, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Science_fiction, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Science_fiction, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+
+## Terror
+
+### Stats
+
+```{r}
+table(piracy.df$Interest_Terror)
+```
+
+
+```{r}
+
+chisq.test(piracy.df$Interest_Terror, piracy.df$Piracy_use, simulate.p.value = TRUE)
+
+piracy.df %>%
+  select(Interest_Terror, Piracy_use) %>%
+  mutate(Interest_Terror = ifelse(Interest_Terror == 4 | Interest_Terror == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+  
+```
+
+
+There is no relationship between documentary and piracy 
+
+
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Terror, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Terror, Piracy_use) %>%
+  mutate(Interest_Terror = ifelse(Interest_Terror == 4 | Interest_Terror == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Terror, Piracy_use) %>%
+  mutate(Interest_Terror = as.factor(Interest_Terror)) %>%
+  group_by(Interest_Terror, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Terror,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Terror, Piracy_use) %>%
+  mutate(Interest_Terror = as.factor(Interest_Terror)) %>%
+  group_by(Interest_Terror, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Terror, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Terror, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+
+## Thriller
+
+### Stats
+
+```{r}
+table(piracy.df$Interest_Thriller)
+```
+
+
+```{r}
+
+chisq.test(piracy.df$Interest_Thriller, piracy.df$Piracy_use, simulate.p.value = TRUE)
+
+piracy.df %>%
+  select(Interest_Thriller, Piracy_use) %>%
+  mutate(Interest_Thriller = ifelse(Interest_Thriller == 4 | Interest_Thriller == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+  
+```
+
+There is a relationship between user interest in thriller and piracy
+
+High Interest in Thriller are more likely to use piracy by an odds of 1.7 more than those with a low interest in thriller
+
+
+### Mosaic Plot
+```{r}
+piracy.df %>%
+  select(Interest_Romance, Piracy_use) %>%
+  table(.) %>%
+  mosaicplot(.)
+
+
+piracy.df %>%
+  select(Interest_Romance, Piracy_use) %>%
+  mutate(Interest_Romance = ifelse(Interest_Romance == 4 | Interest_Romance == 5, "High", "Low")) %>%
+  table(.) %>%
+  mosaicplot(.)
+```
+
+### Plotting
+
+```{r}
+piracy.df %>%
+  select(Interest_Romance, Piracy_use) %>%
+  mutate(Interest_Romance = as.factor(Interest_Romance)) %>%
+  group_by(Interest_Romance, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(Total = `0` + `1`) %>%
+  mutate(`Proportion of Non-Pirates` = round((`0`/(`0`+`1`)),3)) %>%
+  mutate(`Proportion of Pirates` = round((`1`/(`0`+`1`)),3)) %>%
+  ungroup() %>%
+  mutate(Total_All = sum(Total)) %>%
+  mutate(`Proportion of Demographic` = round(Total/Total_All,3)) %>%
+  select(Interest_Romance,`Proportion of Demographic` ,`Proportion of Pirates`, `Proportion of Non-Pirates`)%>%
+reactable(., highlight = TRUE, #allow for row to highlight when selected
+          bordered = TRUE, #include borders between cells
+          striped = TRUE, #striped rows
+          compact = TRUE, # thinner rows
+       
+  #adjust table font
+  theme = reactableTheme(style = list(fontFamily = "-system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif")))
+
+piracy.df %>%
+  select(Interest_Romance, Piracy_use) %>%
+  mutate(Interest_Romance = as.factor(Interest_Romance)) %>%
+  group_by(Interest_Romance, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(values_from = count, names_from = Piracy_use) %>%
+  mutate(`Proportion of Non-Pirates` = `0`/(`0`+`1`)) %>%
+  mutate(`Proportion of Pirates` = `1`/(`0`+`1`)) %>%
+  select(Interest_Romance, `Proportion of Pirates`, `Proportion of Non-Pirates`) %>%
+  pivot_longer(cols = c("Proportion of Pirates", "Proportion of Non-Pirates"),
+                                                      names_to = "Piracy Use",
+                                                      values_to = "Proportion of Participants") %>%
+    ggplot(., aes(x = Interest_Romance, y = `Proportion of Participants`, fill = `Piracy Use`))  + geom_col(stat = "identity", width = 0.5,  position=position_dodge(0.5)) + coord_flip() + theme_stata() + scale_fill_manual(labels = c("Non-Pirate", "Pirate"), values=c("#E7B800", "#00AFBB")) + theme(axis.text.y = element_text(angle = 0, hjust = 1)) + ggtitle("Proportional Piracy by Sex Level") + xlab("User Interest") 
+  
+```
+### Demographics
+
+#### Age
+```{r}
+table(piracy.df$Interest_Thriller, piracy.df$Age)
+```
+
+```{r}
+# temp <- piracy.df %>%
+#   filter(Interest_Thriller != 1) %>%
+#   filter(Interest_Thriller != 2 & Age != 1) %>%
+#   filter(Interest_Thriller != 2 & Age != 3) %>%
+#   filter(Interest_Thriller != 2 & Age != 4) 
+# 
+# temp
+# 
+# chisq.test(temp$Interest_Romance, temp$Age, simulate.p.value = TRUE)
+
+#rm(temp)
+
+piracy.df %>%
+  select(Interest_Romance, Age) %>%
+  mutate(Interest_Romance = ifelse(Interest_Romance == 4 | Interest_Romance == 5 , "High", "Low")) %>%
+  mutate(Age = ifelse(Age == 1 | Age == 2 , "Younger", "Older")) %>%
+  table(.) %>%
+  fisher.test(.)
+```
+
+The odds of younger people having a high interest in romance is about 70% lower than older people
+
+#### Sex
+```{r}
+table(piracy.df$Interest_Thriller, piracy.df$Sex)
+```
+
+```{r}
+
+temp1 <- piracy.df %>%
+  filter(Sex == 1) %>%
+  sample_n(200)
+
+temp2 <- piracy.df %>%
+  filter(Sex == 2) %>%
+  sample_n(200)
+
+temp1 <- rbind(temp1, temp2)
+  
+
+temp <- temp1 %>%
+  filter(Interest_Thriller != 1) 
+  
+  
+chisq.test(temp$Interest_Thriller, temp$Sex, simulate.p.value = TRUE)
+
+rm(temp)
+
+temp1 %>%
+  select(Interest_Thriller, Sex) %>%
+  mutate(Interest_Thriller = ifelse(Interest_Thriller == 4 | Interest_Thriller == 5 , "High", "Low")) %>%
+  table(.) %>%
+  fisher.test(.)
+```
+There is a relationship between Age and whether they watch Thriller 
+
+
+## All Genres
+
+```{r}
+i = 7
+
+for (var in colnames(piracy_allfactors[7:18])) {
+
+#go through each column and make a matrix of the proportion of piracy and n for all genres  
+temp.matrix <- piracy_allfactors %>%
+    group_by(piracy_allfactors[[i]], Piracy_use) %>%   
+    tally() %>%
+    pivot_wider(names_from = Piracy_use, values_from = n) %>%
+    mutate(Pirate = ifelse(is.na(Pirate),0,Pirate)) %>%
+    mutate(`Non-Pirate` = ifelse(is.na(`Non-Pirate`), 0, `Non-Pirate`))%>%
+    mutate(Prop = Pirate/(Pirate + `Non-Pirate`)) %>%
+    mutate(N = Pirate + `Non-Pirate`)
+
+#save the proportion of piracy and n as vectors
+p.g.plot <- as.vector(temp.matrix$Prop)
+n.plot <- as.vector(temp.matrix$N)
+
+#save each genre proportion and n vector in the global environment
+eval(parse(text = paste0('prop', var, 
+                           ' <- p.g.plot')))
+
+eval(parse(text = paste0('n', var, 
+                           ' <- n.plot')))
+  
+i = i + 1
+}
+
+#put all the proportions in the one vector
+check.genre <- c(propInterest_Action, propInterest_Comedy, propInterest_Disaster, propInterest_Documentary, propInterest_Drama, propInterest_Family, propInterest_Fantasy, propInterest_Period, propInterest_Romance, propInterest_Science_fiction, propInterest_Terror, propInterest_Thriller)
+
+#put all the n values in one vector
+n.genre <- c(nInterest_Action, nInterest_Comedy, nInterest_Disaster, nInterest_Documentary, nInterest_Drama, nInterest_Family, nInterest_Fantasy, nInterest_Period, nInterest_Romance, nInterest_Science_fiction, nInterest_Terror, nInterest_Thriller)
+
+#recreate the dataset with the original data labels for interest level and genre
+intlev <- rep(c("Interested", "Neutral", "Slightly Interested", "Uninterested", "Very Interested", "Very Uninterested"),12)
+genre.name <- c(rep("Action", 6), rep("Comedy", 6), rep("Disaster",6), rep("Documentry",6),  rep("Drama", 6), rep("Family", 6), rep("Fantasy", 6), rep("Period", 6), rep("Romance", 6), rep("SciFi", 6), rep("Terror", 6), rep("Thriller", 6))
+
+
+
+
+```
+
+
+```{r}
+#create the final data frame
+heatmap.df <- data.frame(genre.name, intlev, check.genre, n.genre)
+
+#rename columns
+names(heatmap.df)[names(heatmap.df) == "genre.name"] <- "Genre"
+names(heatmap.df)[names(heatmap.df) == "intlev"] <- "Interest_Level"
+names(heatmap.df)[names(heatmap.df) == "check.genre"] <- "Proportion"
+names(heatmap.df)[names(heatmap.df) == "n.genre"] <- "N"
+
+#make sure interest_level column factors are in the right order
+heatmap.df$Interest_Level <- factor(heatmap.df$Interest_Level, 
+                            levels = c("Very Uninterested", "Uninterested", "Neutral", 
+                                       "Slightly Interested", "Interested", "Very Interested"))
+
+#find the average proportion of each row(genre) in the heatmap
+temp <- heatmap.df %>%
+  group_by(Genre) %>%
+  summarise(Average = mean(Proportion), N = sum(N)) %>%
+  pivot_longer(cols = c("Average"),
+               values_to = "Proportion", names_to = "Interest_Level")
+
+#filter out rows that have less than N so that they will be grayed out in the heat map. 
+heatmap.df <- heatmap.df %>%
+  mutate(Proportion = ifelse(N < 5, NA, Proportion)) %>%
+  #add in the extra row about the average proportion
+  rbind(., temp)
+
+#remove because no longer needed. 
+rm(temp)
+
+```
+
+
+
+###Heat Map
+```{r}
+ggplot(heatmap.df, aes(x = Interest_Level, y = Genre, fill = Proportion)) +
+  geom_tile(color = "white", size = 1) +
+  scale_fill_gradientn(colors = c("darkgreen" ,"yellow", "darkred", na.value="lightgrey"),limits = c(0, 1)) +
+  theme_minimal() +
+  geom_label(aes(label =  paste0(round(Proportion, 2), "\n", "n: ", N)), fill = "white", color = "black", size = 2.5) +
+  theme(plot.title = element_text(hjust = 0.5)) +
+  ggtitle("Proportion of Piracy per User Interest Level in Genre") + 
+  xlab("Interest Level")
+  
+```
+
+
+# Platforms and Genres
+
+```{r}
+rom_thriller_prop <- read.csv("justplatforms2.csv")
+```
+
+## Romance Prop
+
+### Normality
+
+
+```{r}
+# add in the romance and thriller proportion information
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE) 
+
+
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE) %>%
+  select(5, 20) %>%
+  filter(Piracy_use == "Pirate") %>%
+  ggplot(., aes(x = RomanceProp)) + geom_histogram(aes(y = ..density..), 
+  bins = 10, fill = "skyblue", color = "black", alpha = 0.7) + geom_density(color = "red", size = 1) + xlab("Proportion of Romance")  + theme_stata() + ggtitle("Normality of Proportion of Romance Content Amongst Pirates")
+
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE) %>%
+  select(5, 20) %>%
+  filter(Piracy_use == "Non-Pirate") %>%
+  ggplot(., aes(x = RomanceProp)) + geom_histogram(aes(y = ..density..), 
+  bins = 10, fill = "skyblue", color = "black", alpha = 0.7) + geom_density(color = "red", size = 1) + xlab("Proportion of Romance")  + theme_stata() + ggtitle("Normality of Proportion of Romance Content Amongst Non-Pirates")
+  
+
+
+
+```
+
+```{r}
+# Shapiro-Wilk normality test for pirates
+
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE) %>%
+  with(., shapiro.test(RomanceProp[Piracy_use == "Pirate"]))
+
+# Shapiro-Wilk normality test for non-pirates
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE) %>%
+  with(., shapiro.test(RomanceProp[Piracy_use == "Non-Pirate"]))
+```
+Non-Normal Distribution as expected
+
+### Boxplot
+
+```{r}
+
+p <- merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE)  %>%
+  ggboxplot(., x = "Piracy_use", y = "RomanceProp",
+          color = "Piracy_use", palette = c("#00AFBB", "#E7B800"),
+        ylab = "Proportion of Romance Content", xlab = "Piracy Use")  + theme_stata() + ggtitle("Romance Content Availability and Piracy Use") + theme(legend.position="none")
+  
+
+ggplotly(p) 
+```
+
+
+
+### T.Test
+```{r}
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE)  %>%
+  var.test(RomanceProp ~ Piracy_use, data = .)
+
+
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE)  %>%
+  t.test(RomanceProp ~ Piracy_use, data = ., var.equal = FALSE)
+```
+
+There is a difference between the average proportion of romance that Pirates and Non-Pirates have access to. Non-Pirates have access to slightly more romance content than Pirates do.
+
+```{r}
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE)  %>%
+  select(allplatforms, RomanceProp, Piracy_use) %>%
+  group_by(allplatforms, RomanceProp, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(names_from = Piracy_use, values_from = count) %>%
+  mutate(`Non-Pirate` = ifelse(is.na(`Non-Pirate`), 0, `Non-Pirate`)) %>%
+  mutate(`Pirate` = ifelse(is.na(`Pirate`), 0, `Pirate`)) %>%
+  mutate(PropPirate = Pirate/(`Non-Pirate`+Pirate)) %>%
+  select(allplatforms, RomanceProp, PropPirate) %>%
+  arrange(desc(RomanceProp)) %>%
+  filter(allplatforms %in% top10factors$allplatforms) 
+
+  
+
+
+```
+
+
+
+## Thriller Prop
+
+### Normality
+
+
+```{r}
+
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE) %>%
+  select(5, 21) %>%
+  filter(Piracy_use == "Pirate") %>%
+  ggplot(., aes(x = ThrillerProp)) + geom_histogram(aes(y = ..density..), 
+  bins = 10, fill = "skyblue", color = "black", alpha = 0.7) + geom_density(color = "red", size = 1) + xlab("Proportion of Thriller")  + theme_stata() + ggtitle("Normality of Proportion of Thriller Content Amongst Pirates")
+
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE) %>%
+  select(5, 21) %>%
+  filter(Piracy_use == "Non-Pirate") %>%
+  ggplot(., aes(x = ThrillerProp)) + geom_histogram(aes(y = ..density..), 
+  bins = 10, fill = "skyblue", color = "black", alpha = 0.7) + geom_density(color = "red", size = 1) + xlab("Proportion of Thriller")  + theme_stata() + ggtitle("Normality of Proportion of Thriller Content Amongst Non-Pirates")
+  
+
+
+
+```
+
+```{r}
+# Shapiro-Wilk normality test for pirates
+
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE) %>%
+  with(., shapiro.test(ThrillerProp[Piracy_use == "Pirate"]))
+
+# Shapiro-Wilk normality test for non-pirates
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE) %>%
+  with(., shapiro.test(ThrillerProp[Piracy_use == "Non-Pirate"]))
+```
+Non-Normal Distribution as expected
+
+### Boxplot
+
+```{r}
+
+p <- merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE)  %>%
+  ggboxplot(., x = "Piracy_use", y = "ThrillerProp",
+          color = "Piracy_use", palette = c("#00AFBB", "#E7B800"),
+        ylab = "Proportion of Thriller Content", xlab = "Piracy Use")  + theme_stata() + ggtitle("Thriller Content Availability and Piracy Use") + theme(legend.position="none")
+  
+
+ggplotly(p) 
+```
+
+
+
+### T.Test
+```{r}
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE)  %>%
+  var.test(ThrillerProp ~ Piracy_use, data = .)
+
+
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE)  %>%
+  t.test(ThrillerProp ~ Piracy_use, data = ., var.equal = FALSE)
+
+```
+There is a difference between the average proportion of thriller that Pirates and Non-Pirates have access to. Non-Pirates have access to slightly more thriller content than Pirates do.
+
+```{r}
+merge(x = piracy_factor, y = rom_thriller_prop, by = "allplatforms", all.x = TRUE)  %>%
+  select(allplatforms, ThrillerProp, Piracy_use) %>%
+  group_by(allplatforms, ThrillerProp, Piracy_use) %>%
+  summarise(count = n()) %>%
+  pivot_wider(names_from = Piracy_use, values_from = count) %>%
+  mutate(`Non-Pirate` = ifelse(is.na(`Non-Pirate`), 0, `Non-Pirate`)) %>%
+  mutate(`Pirate` = ifelse(is.na(`Pirate`), 0, `Pirate`)) %>%
+  mutate(PropPirate = Pirate/(`Non-Pirate`+Pirate)) %>%
+  select(allplatforms, ThrillerProp, PropPirate) %>%
+  arrange(desc(ThrillerProp)) %>%
+  filter(allplatforms %in% top10factors$allplatforms) 
+
+```
+
+
+
+# Dimension Reduction
+
+## FAMD
+```{r}
+famd.piracy <- FAMD(piracy_factor, graph = FALSE)
+summary(famd.piracy)
+```
+
+## Plot
+```{r}
+fviz_eig(famd.piracy, addlabels = TRUE, hjust = -0.3, linecolor = "red", barfill = "darkblue", barcolor = "darkblue") + ylim(0,5) + theme_stata() + labs(title = "Variances - FAMD", x = "Principal Components", y = "% of Explained Variances")
+```
+
+
+
